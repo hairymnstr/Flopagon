@@ -1,0 +1,13 @@
+Designator,Val,Package,Mid X,Mid Y,Rotation,Layer
+C1,100nF,C_0603_1608Metric,123,-110.4,180,bottom
+C2,100nF,C_0603_1608Metric,118,-83.175,90,bottom
+D2,LED_Pad,LED_1204_Sideview,133.2,-84.1,270,bottom
+R1,470Ω,R_0603_1608Metric,130.8,-83.95,90,bottom
+R2,2.2kΩ,R_0603_1608Metric,117.8,-113,270,bottom
+R3,2.2kΩ,R_0603_1608Metric,119.4,-113,270,bottom
+R4,2.2kΩ,R_0603_1608Metric,116.2,-113,270,bottom
+R5,10kΩ,R_0603_1608Metric,129.2,-83.95,90,bottom
+R6,10kΩ,R_0603_1608Metric,129.925,-86.25,180,bottom
+R7,10kΩ,R_0603_1608Metric,118,-86.2,90,bottom
+U1,M24C01-RMN,SOIC-8_3.9x4.9mm_P1.27mm,124,-114,180,bottom
+U2,W25Q128JVSIQ,SOIC-8_5.23x5.23mm_P1.27mm,123.6,-84.6,180,bottom
