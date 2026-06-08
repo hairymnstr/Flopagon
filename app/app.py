@@ -1,9 +1,13 @@
 from lib.flash_spi import FLASH
 from system.hexpansion.config import HexpansionConfig
+from system.eventbus import eventbus
 from machine import SPI, Pin
-import os
+import vfs
 import app
+from system.launcher.app import InstallNotificationEvent
 from app_components import Menu, Notification, clear_background
+from system.scheduler.events import RequestForegroundPushEvent
+from system.hexpansion.events import HexpansionRemovalEvent
 
 # default location to mount the main flash device
 MOUNTPATH = "/flopagon"
@@ -24,6 +28,9 @@ class FlopagonApp(app.App):
         # create a handle for the notification
         self.notification = None
 
+        # create a flag to request foreground exactly once
+        self.foregrounded = False
+
         # set up the chip select pin, it's the first high-speed IO pin on the hexpansion
         cspin = self.config.pin[0]
         cspin.init(cspin.OUT, value=1)
@@ -38,21 +45,31 @@ class FlopagonApp(app.App):
         # at this point if all is working
         self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
 
+        self.mounted = False
+
         # run the app class init
         super().__init__()
+
+    def deinit(self):
+        if self.mounted:
+            vfs.umount(MOUNTPATH)
+        self.hspi.deinit()
 
     def select_handler(self, item, item_idx):
         # menu handler we try catch this whole thing to keep the code small for embedding in the EEPROM
         try:
             if item == "Mount":
                 # mounts the device at the default location
-                os.mount(self.flash, MOUNTPATH)
+                vfs.mount(self.flash, MOUNTPATH)
+                eventbus.emit(InstallNotificationEvent())
+                self.mounted = True
             elif item == "Remove":
                 # unmounts (safely removes) the storage
-                os.umount(MOUNTPATH)
+                vfs.umount(MOUNTPATH)
+                self.mounted = False
             elif item == "Format":
                 # Format the drive as FAT
-                os.VfsFat.mkfs(self.flash)
+                vfs.VfsFat.mkfs(self.flash)
             # if the try-catch hasn't jumped out yet then what we tried to do must have succeded
             self.notification = Notification(f"{item} succeded")
         except Exception as err:
@@ -71,6 +88,10 @@ class FlopagonApp(app.App):
             self.notification.draw(ctx)
 
     def update(self, delta):
+        if not self.foregrounded: # Bring the app to the foreground on first run
+            eventbus.emit(RequestForegroundPushEvent(self))
+            self.foregrounded = True
+        
         self.menu.update(delta)
         if self.notification:
             self.notification.update(delta)
