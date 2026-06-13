@@ -4,10 +4,10 @@ from system.eventbus import eventbus
 from machine import SPI, Pin
 import vfs
 import app
+import sys
 from system.launcher.app import InstallNotificationEvent
 from app_components import Menu, Notification, clear_background
 from system.scheduler.events import RequestForegroundPushEvent
-from system.hexpansion.events import HexpansionRemovalEvent
 
 # default location to mount the main flash device
 MOUNTPATH = "/flopagon"
@@ -43,7 +43,12 @@ class FlopagonApp(app.App):
         # Create a handle on the flash object, if you watch the serial console you'll see
         #  1 chips detected. Total flash size 16MiB.
         # at this point if all is working
-        self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
+        try:
+            self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
+        except ValueError:
+            self.hspi.deinit()
+            self.hspi = SPI(1, 10000000, sck=self.config.pin[1], mosi=self.config.pin[2], miso=self.config.pin[3])
+            self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
 
         self.mounted = False
 
@@ -53,7 +58,11 @@ class FlopagonApp(app.App):
     def deinit(self):
         if self.mounted:
             vfs.umount(MOUNTPATH)
-        self.hspi.deinit()
+            if MOUNTPATH in sys.path:
+                del sys.path[sys.path.index(MOUNTPATH)]
+            eventbus.emit(InstallNotificationEvent())
+            self.mounted = False
+            self.hspi.deinit()
 
     def select_handler(self, item, item_idx):
         # menu handler we try catch this whole thing to keep the code small for embedding in the EEPROM
@@ -61,12 +70,12 @@ class FlopagonApp(app.App):
             if item == "Mount":
                 # mounts the device at the default location
                 vfs.mount(self.flash, MOUNTPATH)
+                sys.path.append(MOUNTPATH)
                 eventbus.emit(InstallNotificationEvent())
                 self.mounted = True
             elif item == "Remove":
                 # unmounts (safely removes) the storage
-                vfs.umount(MOUNTPATH)
-                self.mounted = False
+                self.deinit()
             elif item == "Format":
                 # Format the drive as FAT
                 vfs.VfsFat.mkfs(self.flash)
