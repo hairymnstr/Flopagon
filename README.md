@@ -57,7 +57,7 @@ On the host change into the `app` directory of a checkout of this repository and
 This will connect to the running micropython system on your badge, hit `Ctrl-C` to
 interrupt the normal OS and get a Python prompt.
 
-    from prepare_eeprom import setup_flopagon_v1
+    from prepare_eeprom import setup_flopagon
 
 (Obviously import setup_flopagon_v2 if you've got one of the new black ones.  The
 only difference is the size of the EEPROM in the header)
@@ -66,7 +66,7 @@ Fit the flopagon into a port, they're numbered from 1 clockwise from the top/rig
 port.  Short the write-protect jumper, I normally stuff a pair of tweezers in the 
 holes.  Now run the command:
 
-    setup_flopagon_v1(2)
+    setup_flopagon(2)
 
 The port number needs to be passed, in this example I've used port 2 (right hand
 side).  That should do all the formatting and mount and copy the app onto the EEPROM.
