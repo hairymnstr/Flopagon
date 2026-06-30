@@ -1,25 +1,23 @@
 from lib.flash_spi import FLASH
 from system.hexpansion.config import HexpansionConfig
 from system.eventbus import eventbus
-from machine import SPI, Pin
+from machine import SPI
 import vfs
 import app
 import sys
-from system.launcher.app import InstallNotificationEvent
+from system.launcher.app import AppDirAddedNotificationEvent, AppDirRemovedNotificationEvent
 from app_components import Menu, Notification, clear_background
 from system.scheduler.events import RequestForegroundPushEvent
 
 # default location to mount the main flash device
 MOUNTPATH = "/flopagon"
+APPDIR = "/floppy_apps"
+
 # menu item text for three options
 main_menu_items = ["Mount", "Remove", "Format"]
 
 class FlopagonApp(app.App):
     def __init__(self, config=None):
-        # if this is run from the EEPROM then config will be a HexpansionConfig for whatever slot it's plugged into
-        # if not then we assume it's plugged into slot 2 (right hand side) for testing the app
-        if config == None:
-            config = HexpansionConfig(2)
         self.config = config
 
         # Make a menu GUI widget with the mount, unmount and format options
@@ -36,19 +34,20 @@ class FlopagonApp(app.App):
         cspin.init(cspin.OUT, value=1)
         self.cspins = (cspin,)
 
-        # set up the SPI device, we specify all the pins and max out at 10MHz
-        # SPI 2 is used for the CTX graphics driver, SPI1 can be used by python code
-        self.hspi = SPI(1, 10000000, sck=self.config.pin[1], mosi=self.config.pin[2], miso=self.config.pin[3])
-
-        # Create a handle on the flash object, if you watch the serial console you'll see
-        #  1 chips detected. Total flash size 16MiB.
-        # at this point if all is working
-        try:
-            self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
-        except ValueError:
-            self.hspi.deinit()
+        for _ in range(2):
+            # set up the SPI device, we specify all the pins and max out at 10MHz
+            # SPI 2 is used for the CTX graphics driver, SPI1 can be used by python code
             self.hspi = SPI(1, 10000000, sck=self.config.pin[1], mosi=self.config.pin[2], miso=self.config.pin[3])
-            self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
+
+            # Create a handle on the flash object, if you watch the serial console you'll see
+            #  1 chips detected. Total flash size 16MiB.
+            # at this point if all is working
+            try:
+                self.flash = FLASH(self.hspi, self.cspins, cmd5=False)
+                break
+            except ValueError:
+                # deinit and try again
+                self.hspi.deinit()
 
         self.mounted = False
 
@@ -60,7 +59,7 @@ class FlopagonApp(app.App):
             vfs.umount(MOUNTPATH)
             if MOUNTPATH in sys.path:
                 del sys.path[sys.path.index(MOUNTPATH)]
-            eventbus.emit(InstallNotificationEvent())
+            eventbus.emit(AppDirRemovedNotificationEvent(MOUNTPATH+APPDIR))
             self.mounted = False
             self.hspi.deinit()
 
@@ -71,7 +70,7 @@ class FlopagonApp(app.App):
                 # mounts the device at the default location
                 vfs.mount(self.flash, MOUNTPATH)
                 sys.path.append(MOUNTPATH)
-                eventbus.emit(InstallNotificationEvent())
+                eventbus.emit(AppDirAddedNotificationEvent(MOUNTPATH+APPDIR))
                 self.mounted = True
             elif item == "Remove":
                 # unmounts (safely removes) the storage
